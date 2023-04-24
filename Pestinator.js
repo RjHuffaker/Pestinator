@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
-// @namespace    http://tampermonkey.net/
-// @version      0.1
+// @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
+// @version      0.2
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
