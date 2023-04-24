@@ -61,20 +61,25 @@
     }
 
     const ppLocationDetail = () => {
-        function goToServSuite(){
+        function goToSSAccount(){
+            window.open('https://sprolive.theservicepro.net/user/home.aspx');
+
             var xpath = "//span[text()='ServSuite']";
             var servSuiteLabel = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
             var servSuiteText = servSuiteLabel.parentElement.lastChild;
             var servSuiteID = servSuiteText.textContent.substring(2);
-            GM_setValue('goToSSID', servSuiteID);
+            
+            GM_setValue('PP_to_SS_ID', servSuiteID);
         }
 
-        var xpath = "//span[text()='ServSuite']";
-        var servSuiteLabel = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        var servSuiteText = servSuiteLabel.parentElement.lastChild;
-        var servSuiteID = servSuiteText.textContent.substring(2);
-        servSuiteLabel.addEventListener('click', goToServSuite);
-        servSuiteLabel.style.cursor = 'pointer';
+        const ssLink = document.createElement('button');
+        ssLink.innerHTML = 'ServSuite';
+        ssLink.style.cursor = 'pointer';
+        ssLink.classList.add("scorpinated");
+        ssLink.onclick = goToSSAccount;
+
+        const pageHeader = document.getElementById('page-header');
+        pageHeader.appendChild(ssLink);
     }
 
     const ppLocationEdit = () => {
@@ -113,17 +118,18 @@
             const txtSearchCriteria = document.getElementById("txtSearchCriteria");
             txtSearchCriteria.focus();
             txtSearchCriteria.value = SSID;
-            GM_setValue('goToSSID', '');
+            GM_setValue('PP_to_SS_ID', '');
             document.getElementById('search_button').click();
             document.getElementsByClassName('sorting_1')[0].children[0].click();
+            window.close();
         }
 
-        GM_addValueChangeListener("goToSSID", function(name, old_value, new_value, remote){});
+        GM_addValueChangeListener("PP_to_SS_ID", function(name, old_value, new_value, remote){});
 
-        GM_addValueChangeListener("goToSSID", function(name, old_value, new_value, remote){
-            console.log("goToSSID listener");
+        GM_addValueChangeListener("PP_to_SS_ID", function(name, old_value, new_value, remote){
+            console.log("PP_to_SS_ID listener");
             if(new_value){
-                console.log('NEW VALUE', new_value);
+                console.log('NEW PP_to_SS_ID VALUE', new_value);
                 goToSSAccount(new_value);
 
             }
@@ -139,11 +145,11 @@
             setTimeout(()=>{
                 GM_setValue('SS_to_PP_ID', '');
                 GM_setValue('SS_to_PP_ID', PPID);
-            },1000);
+            }, 2000);
         }
 
         const ppLink = document.createElement('button');
-        ppLink.innerHTML = '&nbsp;&nbsp; PP';
+        ppLink.innerHTML = 'PestPac';
         ppLink.classList.add("scorpinated");
         ppLink.onclick = goToPPAccount;
         const accountLink = document.getElementById('lbeditaccount');

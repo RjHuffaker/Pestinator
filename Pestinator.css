@@ -1,0 +1,20 @@
+@font-face {
+	font-family: NewRocker;
+	src: url('https://rjhuffaker.github.io/NewRocker.ttf');
+}
+
+.pestinated, .pestinated * {
+	font-family: NewRocker !important;
+	font-weight: normal;
+	font-size: 12px;
+	color: black;
+}
+
+button.pestinated {
+	font-size: 14px;
+}
+
+button.pestinated:hover {
+	background-color: #9B6E1D;
+	color: white;
+}
