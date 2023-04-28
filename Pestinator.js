@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.300
+// @version      0.301
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -38,11 +38,23 @@
         document.getElementsByTagName("HEAD")[0].appendChild(link);
     }
 
+    function getElementsStartsWithId( id ) {
+        var children = document.body.getElementsByTagName('*');
+        var elements = [], child;
+        for (var i = 0, length = children.length; i < length; i++) {
+            child = children[i];
+            if (child.id.substr(0, id.length) == id) elements.push(child);
+        }
+        return elements;
+    }
+
     function getSsid(){
         const xpath = "//span[text()='ServSuite']";
         const servSuiteLabel = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
         const servSuiteText = servSuiteLabel.parentElement.lastChild;
-        return servSuiteText.textContent.substring(2);
+        const ssid = servSuiteText.textContent.substring(2);
+    //    return ("0000" + ssid).slice(-5);
+        return ssid;
     }
 
     function getWeekday(input){
@@ -69,6 +81,8 @@
             { input: "General Pest Control - Monthly", output: "PC-MONTHLY" },
             { input: "General Pest Control - Bi Monthly", output: "PC-BIMONTHLY" },
             { input: "General Pest Control - Quarterly", output: "PC-QUARTERLY" },
+            { input: "Warranty Inspection", output: "T-RENEWAL" }
+
         ].forEach((obj)=>{
             if(service === obj.input){
                 serviceCode = obj.output
@@ -78,18 +92,71 @@
     }
 
     function parseSchedule(service, month, week, day){
-        let schedule;
+        let frequency;
         [
             { input: "PC-WEEKLY", output: "W" },
             { input: "PC-MONTHLY", output: "M" },
             { input: "PC-BIMONTHLY", output: "B" },
-            { input: "PC-QUARTERLY", output: "Q" }
+            { input: "PC-QUARTERLY", output: "Q" },
+            { input: "T-RENEWAL", output: "ANNUAL" }
+
         ].forEach((obj)=>{
             if(service === obj.input){
-                schedule = obj.output+month+week+day;
+                frequency = obj.output;
             }
         });
-        return schedule;
+        if(frequency==="ANNUAL"){
+            return frequency+month;
+        } else if(frequency==="W"){
+            return frequency+day;
+        } else if(frequency==="M"){
+            return frequency+week+day;
+        } else if(frequency==="B"){
+            if(month==="JAN" || month==="MAR" || month==="MAY" || month==="JUL" || month==="SEP" || month==="NOV"){
+                return "BJAN"+week+day;
+            } else if(month==="FEB" || month==="APR" || month==="JUN" || month==="AUG" || month==="OCT" || month==="DEC"){
+                return "BFEB"+week+day;
+            }
+        } else if(frequency==="Q"){
+            if(month==="JAN" || month==="APR" || month==="JUL" || month==="OCT"){
+                return "QJAN"+week+day;
+            } else if(month==="FEB" || month==="MAY" || month==="AUG" || month==="NOV"){
+                return "QFEB"+week+day;
+            } else if(month==="MAR" || month==="JUN" || month==="SEP" || month==="DEC"){
+                return "QMAR"+week+day;
+            }
+            return frequency+month+week+day;
+        }
+    }
+
+    function execute(commands){
+        let command = commands.shift();
+
+        setTimeout(()=>{
+            let errors = [];
+            if(command.input){
+                try {
+                    const input = document.getElementById(command.input.target);
+                    input.focus();
+                    input.value = command.input.value;
+                    input.blur();
+                } catch(e){
+                    errors.push(e)
+                }
+            } else if(command.click){
+                try {
+                    document.getElementById(command.click).click();
+                } catch(e){
+                    errors.push(e)
+                }
+            } else if(command.open){
+                window.open(command.open);
+            }
+            if(errors.length < 1 && commands.length > 0){
+                console.log(commands);
+                execute(commands);
+            }
+        },100);
     }
 
     const initializePestinator = () => {
@@ -120,6 +187,14 @@
     }
 
     const ppLocationDetail = () => {
+        const ssid = getSsid();
+
+        if(ssid.length < 5){
+            GM_setValue('quicksave', true);
+            execute([{click:'locationHeaderDetailLink'}]);
+        }
+
+
         const goToSSHandler = () => {
             window.open('https://sprolive.theservicepro.net/user/home.aspx');
             const ssid = getSsid();
@@ -142,29 +217,43 @@
 
         GM_deleteValue('SS_to_PP');
 
-        const SS_program = GM_getValue('SS_program');
+        GM_addValueChangeListener('SS_program', function(name, old_value, new_value, remote){});
 
-        const ssid = getSsid();
+        GM_addValueChangeListener('SS_program', function(name, old_value, SS_program, remote){
+            if(!SS_program) return;
+            window.focus();
+            setTimeout(()=>{
+              //  if(confirm("Transfer service from "+SS_program.id+" to "+ssid+"?")){
+                    addServiceSetup();
+              //  }
+            },500)
 
-        if(SS_program && SS_program.id !== ssid){
-            if(confirm(SS_program.id+" != "+ssid)){
-                addServiceSetup();
-            }
-        } else if(SS_program && SS_program.id !== ssid){
-            addServiceSetup();
-        }
+        });
     }
 
     const ppLocationEdit = () => {
         const taxCodeInput = document.getElementById('TaxCode');
+        taxCodeInput.focus();
         taxCodeInput.value = 'NO TAX';
+        taxCodeInput.click();
+        taxCodeInput.blur();
 
         const ssInput = document.getElementById('UserDef1');
         const ssid = ssInput.value;
         ssInput.value = ("0000" + ssid).slice(-5);
+
+        const directionsInput = document.getElementById('Directions');
+        if(!directionsInput.value.match(/\*/g)){
+            directionsInput.value = "** "+directionsInput.value;
+        }
+        if(GM_getValue('quicksave')){
+            GM_deleteValue('quicksave');
+            execute([{click:'butSave'}])
+        }
     }
 
     const ppSearchDefault = () => {
+
         const goToPPListener = (PPID) => {
             const ssInput = document.getElementsByName('UserDef1')[0];
             ssInput.focus();
@@ -194,7 +283,7 @@
             document.getElementById('search_button').click();
             setTimeout(() => {
                 window.close();
-            }, 2000);
+            }, 3000);
         }
 
         const PP_to_SS = GM_getValue('PP_to_SS');
@@ -221,33 +310,33 @@
         setTimeout(()=>{
             const programTables = document.getElementsByClassName('programdetails');
 
+            const programRow = getElementsStartsWithId('trEventRow');
+
             let programDetails = [];
 
-            const copyProgram = (i) => {
-                let program = programDetails[i];
+            const copyProgram = (e) => {
+                let program = programDetails[e.target.id.split('_')[1]];
                 program.id = document.getElementById('lbeditaccount').textContent.split(' ')[2];
-                console.log(program);
+                GM_setValue('SS_program','');
                 GM_setValue('SS_program', program);
             }
 
-            Array.from(programTables).forEach((table, i) => {
-                if(table.children[0]?.children){
-                    let program = {};
-                    program.service = table.children[0].children[1].children[1].children[0].textContent;
-                    program.lastDate = table.children[0].children[1].children[2].textContent;
-                    program.nextDate = table.children[0].children[1].children[3].textContent;
-                    program.cancel = table.children[0].children[1].children[4].textContent;
-                    program.ammount = table.children[0].children[1].children[5].textContent;
-                    program.prodAmmount = table.children[0].children[1].children[6].textContent;
-                    program.route = table.children[0].children[1].children[7].textContent;
-
-                    programDetails.push(program);
+            Array.from(programRow).forEach((row, i) => {
+                let program = {};
+                if(row.children){
+                    program.service = row.children[1].children[0].textContent;
+                    program.lastDate = row.children[2].textContent;
+                    program.nextDate = row.children[3].textContent;
+                    program.ammount = row.children[5].textContent;
+                    program.route = row.children[7].textContent;
 
                     const ppLink = document.createElement('button');
                     ppLink.innerHTML = 'PP';
-                    ppLink.onclick = (e) => { e.preventDefault(); copyProgram(i); }
-                    table.children[0].children[1].children[0].replaceChildren(ppLink);
+                    ppLink.id = 'ppLink_'+i;
+                    ppLink.onclick = (e) => { e.preventDefault(); copyProgram(e); }
+                    row.children[0].replaceChildren(ppLink);
                 }
+                programDetails.push(program);
             });
         },1000);
     }
@@ -261,6 +350,43 @@
             const serviceCode = convertService(program.service);
             const schedule = parseSchedule(serviceCode, month, week, weekday);
 
+            execute([
+                {
+                    input: {
+                        target: 'ServiceCode1',
+                        value: serviceCode
+                    }
+                },
+                {
+                    input: {
+                        target: 'UnitPrice1',
+                        value: program.ammount.replace('$','')
+                    }
+                },
+                {
+                    input: {
+                        target: 'Schedule',
+                        value: schedule
+                    }
+                },
+                {
+                    input: {
+                        target: 'Route',
+                        value: program.route.substring(0,1)
+                    }
+                },
+                {
+                    input: {
+                        target: 'Duration',
+                        value: '00:25'
+                    }
+                },
+                {
+                    click: 'AnyTimeSpan2'
+                }
+            ]);
+
+            /*
             const serviceCodeInput = document.getElementById('ServiceCode1');
             const unitPriceInput = document.getElementById('UnitPrice1');
             const scheduleInput = document.getElementById('Schedule');
@@ -279,12 +405,13 @@
             unitPriceInput.blur();
 
             routeInput.focus();
-            routeInput.value = program.route;
+            routeInput.value = program.route.substring(0,1);
             routeInput.blur();
+            */
         }
 
         const program = GM_getValue('SS_program');
-        GM_deleteValue('SS_program');
+        GM_setValue('SS_program','');
 
         if(program) enterSetupDetails(program);
 
