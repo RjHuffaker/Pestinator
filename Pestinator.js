@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.302
+// @version      0.303
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -365,6 +365,26 @@
             const month = getMonth(lastDate);
             const serviceCode = convertService(program.service);
             const schedule = parseSchedule(serviceCode, month, week, weekday);
+            const ammount = parseInt(program.ammount.replace('$',''));
+            let duration = 25;
+
+            if(ammount > 175){
+                duration = 200;
+            } else if(ammount > 150){
+                duration = 130;
+            } else if(ammount > 125){
+                duration = 115;
+            } else if(ammount > 100){
+                duration = 100;
+            } else if(ammount > 90){
+                duration = 55
+            } else if(ammount > 80){
+                duration = 50
+            } else if(ammount > 70){
+                duration = 40
+            } else if(ammount > 60){
+                duration = 35
+            }
 
             execute([
                 {
@@ -376,7 +396,7 @@
                 {
                     input: {
                         target: 'UnitPrice1',
-                        value: program.ammount.replace('$','')
+                        value: ammount
                     }
                 },
                 {
@@ -394,7 +414,7 @@
                 {
                     input: {
                         target: 'Duration',
-                        value: '00:25'
+                        value: duration
                     }
                 },
                 {
