@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.303
+// @version      0.304
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -81,6 +81,7 @@
             { input: "General Pest Control - Monthly", output: "PC-MONTHLY" },
             { input: "General Pest Control - Bi Monthly", output: "PC-BIMONTHLY" },
             { input: "General Pest Control - Quarterly", output: "PC-QUARTERLY" },
+            { input: "General Pest Control - Semi Annual", output: "PC-SEMIANNUAL" },
             { input: "Warranty Inspection", output: "T-RENEWAL" },
             { input: "Termite Inspection Only", output: "T-INSPECTION" }
 
@@ -99,6 +100,7 @@
             { input: "PC-MONTHLY", output: "M" },
             { input: "PC-BIMONTHLY", output: "B" },
             { input: "PC-QUARTERLY", output: "Q" },
+            { input: "PC-SEMIANNUAL", output: "SEMI" },
             { input: "T-RENEWAL", output: "ANNUAL" },
             { input: "T-INSPECTION", output: "ANNUAL" }
 
@@ -107,7 +109,7 @@
                 frequency = obj.output;
             }
         });
-        if(frequency==="ANNUAL"){
+        if(frequency==="SEMI" || frequency==="ANNUAL"){
             return frequency+month;
         } else if(frequency==="W"){
             return frequency+day;
