@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.301
+// @version      0.302
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -81,7 +81,8 @@
             { input: "General Pest Control - Monthly", output: "PC-MONTHLY" },
             { input: "General Pest Control - Bi Monthly", output: "PC-BIMONTHLY" },
             { input: "General Pest Control - Quarterly", output: "PC-QUARTERLY" },
-            { input: "Warranty Inspection", output: "T-RENEWAL" }
+            { input: "Warranty Inspection", output: "T-RENEWAL" },
+            { input: "Termite Inspection Only", output: "T-INSPECTION" }
 
         ].forEach((obj)=>{
             if(service === obj.input){
@@ -98,7 +99,8 @@
             { input: "PC-MONTHLY", output: "M" },
             { input: "PC-BIMONTHLY", output: "B" },
             { input: "PC-QUARTERLY", output: "Q" },
-            { input: "T-RENEWAL", output: "ANNUAL" }
+            { input: "T-RENEWAL", output: "ANNUAL" },
+            { input: "T-INSPECTION", output: "ANNUAL" }
 
         ].forEach((obj)=>{
             if(service === obj.input){
@@ -300,6 +302,15 @@
             GM_setValue('SS_to_PP', {id: id});
         }
 
+        const findSiteAddress = (target) => {
+            const siteHeaderRow = target
+                                 .parentElement.parentElement.parentElement.parentElement.parentElement
+                                 .parentElement.parentElement.parentElement.parentElement.parentElement
+                                 .parentElement.parentElement.parentElement.parentElement.parentElement
+                                 .parentElement.parentElement.parentElement.parentElement.parentElement.children[0];
+            const address1 = siteHeaderRow.children[6]+" "+siteHeaderRow.children[7];
+        }
+
         const ppLink = document.createElement('button');
         ppLink.innerHTML = 'PestPac';
         ppLink.classList.add("pestinated");
@@ -307,8 +318,13 @@
         const accountLink = document.getElementById('lbeditaccount');
         accountLink.parentElement.appendChild(ppLink);
 
+
+
+
         setTimeout(()=>{
             const programTables = document.getElementsByClassName('programdetails');
+
+            const siteHeaders = document.getElementsByClassName('siteheaderrow');
 
             const programRow = getElementsStartsWithId('trEventRow');
 
@@ -338,7 +354,7 @@
                 }
                 programDetails.push(program);
             });
-        },1000);
+        },2000);
     }
 
     const ppServiceSetup = () => {
