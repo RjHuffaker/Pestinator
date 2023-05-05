@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.304
+// @version      0.305
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -82,8 +82,12 @@
             { input: "General Pest Control - Bi Monthly", output: "PC-BIMONTHLY" },
             { input: "General Pest Control - Quarterly", output: "PC-QUARTERLY" },
             { input: "General Pest Control - Semi Annual", output: "PC-SEMIANNUAL" },
+            { input: "Rodent Control - Monthly", output: "R-MONTHLY" },
+            { input: "Rodent Control - Bi Monthly", output: "R-BIMONTHLY" },
+            { input: "Rodent Control - Quarterly", output: "R-QUARTERLY" },
             { input: "Warranty Inspection", output: "T-RENEWAL" },
-            { input: "Termite Inspection Only", output: "T-INSPECTION" }
+            { input: "Termite Inspection Only", output: "T-INSPECTION" },
+            { input: "Moisture Control Inspection", output: "M-INSPECTION" }
 
         ].forEach((obj)=>{
             if(service === obj.input){
@@ -101,8 +105,12 @@
             { input: "PC-BIMONTHLY", output: "B" },
             { input: "PC-QUARTERLY", output: "Q" },
             { input: "PC-SEMIANNUAL", output: "SEMI" },
+            { input: "R-MONTHLY", output: "M" },
+            { input: "R-BIMONTHLY", output: "B" },
+            { input: "R-QUARTERLY", output: "Q" },
             { input: "T-RENEWAL", output: "ANNUAL" },
-            { input: "T-INSPECTION", output: "ANNUAL" }
+            { input: "T-INSPECTION", output: "ANNUAL" },
+            { input: "M-INSPECTION", output: "ANNUAL" }
 
         ].forEach((obj)=>{
             if(service === obj.input){
