@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.305
+// @version      0.306
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -370,9 +370,11 @@
     const ppServiceSetup = () => {
         const enterSetupDetails = (program) => {
             const lastDate = new Date(program.lastDate)
+            const nextDate = new Date(program.nextDate);
             const weekday = getWeekday(lastDate);
-            const week = getWeek(lastDate);
-            const month = getMonth(lastDate);
+
+            const week = getWeek(nextDate ? nextDate : lastDate);
+            const month = getMonth(nextDate ? nextDate : lastDate);
             const serviceCode = convertService(program.service);
             const schedule = parseSchedule(serviceCode, month, week, weekday);
             const ammount = parseInt(program.ammount.replace('$',''));
