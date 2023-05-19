@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.306
+// @version      0.308
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
 // @match        sprolive.theservicepro.net/*
+// @match        organicspiderman.fieldroutes.com/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
 // @grant        window.focus
 // @grant        window.close
@@ -48,13 +49,12 @@
         return elements;
     }
 
-    function getSsid(){
-        const xpath = "//span[text()='ServSuite']";
-        const servSuiteLabel = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        const servSuiteText = servSuiteLabel.parentElement.lastChild;
-        const ssid = servSuiteText.textContent.substring(2);
-    //    return ("0000" + ssid).slice(-5);
-        return ssid;
+    function getOldAccount(){
+        const xpath = "//span[text()='OldAccount']";
+        const oldAccountLabel = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        const oldAccountText = oldAccountLabel.parentElement.lastChild;
+        const oldAccount = oldAccountText.textContent.substring(2);
+        return oldAccount;
     }
 
     function getWeekday(input){
@@ -77,6 +77,7 @@
         console.log(service);
         let serviceCode;
         [
+
             { input: "General Pest Control - Weekly", output: "PC-WEEKLY" },
             { input: "General Pest Control - Monthly", output: "PC-MONTHLY" },
             { input: "General Pest Control - Bi Monthly", output: "PC-BIMONTHLY" },
@@ -145,30 +146,35 @@
         let command = commands.shift();
 
         setTimeout(()=>{
+
             let errors = [];
-            if(command.input){
-                try {
-                    const input = document.getElementById(command.input.target);
-                    input.focus();
-                    input.value = command.input.value;
-                    input.blur();
-                } catch(e){
-                    errors.push(e)
+            if(!command.conditional){
+                if(command.input && command.input.value){
+                    try {
+                        const input = document.getElementById(command.input.target);
+                        input.focus();
+                        input.value = command.input.value;
+                        input.blur();
+                    } catch(e){
+                        errors.push(e)
+                    }
+                } else if(command.click){
+                    try {
+                        console.log(document.getElementById(command.click));
+
+                        document.getElementById(command.click).click();
+                    } catch(e){
+                        errors.push(e)
+                    }
+                } else if(command.open){
+                    window.open(command.open);
                 }
-            } else if(command.click){
-                try {
-                    document.getElementById(command.click).click();
-                } catch(e){
-                    errors.push(e)
-                }
-            } else if(command.open){
-                window.open(command.open);
             }
+
             if(errors.length < 1 && commands.length > 0){
-                console.log(commands);
                 execute(commands);
             }
-        },100);
+        }, 100);
     }
 
     const initializePestinator = () => {
@@ -196,51 +202,76 @@
             retrieveCSS();
             ssCustomerHome();
         }
+        if(urlContains(["organicspiderman.fieldroutes.com/customers"])){
+            prCustomers();
+        }
     }
 
     const ppLocationDetail = () => {
-        const ssid = getSsid();
+        const ssid = getOldAccount();
 
-        if(ssid.length < 5){
-            GM_setValue('quicksave', true);
-            execute([{click:'locationHeaderDetailLink'}]);
+        const branch = document.getElementById('Branch').value;
+
+        let oldPlatform = '';
+
+        if(branch === 'Spider Man Natural Pest Control'){
+            oldPlatform = 'FieldRoutes';
+        } else if( branch === 'Sentry Exterminating Co'){
+            oldPlatform = 'ServSuite';
         }
-
 
         const goToSSHandler = () => {
-            window.open('https://sprolive.theservicepro.net/user/home.aspx');
-            const ssid = getSsid();
-            GM_setValue('PP_to_SS', {id: ssid});
+            const oldAccount = getOldAccount();
+
+            if(oldPlatform==='ServSuite'){
+                GM_setValue('PP_to_SS', {id: oldAccount});
+                window.open('https://sprolive.theservicepro.net/user/home.aspx');
+            } else if(oldPlatform==='FieldRoutes'){
+                console.log(oldAccount);
+                GM_setValue('PP_to_PR', {id: oldAccount});
+                window.open('https://organicspiderman.fieldroutes.com/customers');
+
+            }
         }
 
-        const addServiceSetup = () => {
-            document.getElementById('recurringServicesContainer').children[0].children[0].children[0].children[1].click();
-            document.getElementsByClassName('pendo-location-recurring-service__add-setup')[0].click();
+        const addServiceSetup = (addSetup) => {
+            const oldAccount = getOldAccount();
+            console.log(oldAccount+' ? '+addSetup.id);
+            if(oldAccount===addSetup.id){
+                window.focus();
+                setTimeout(()=>{
+                    document.getElementById('recurringServicesContainer').children[0].children[0].children[0].children[1].click();
+                    document.getElementsByClassName('pendo-location-recurring-service__add-setup')[0].click();
+                },500)
+            } else {
+                window.focus();
+                window.location.href = 'https://app.west.pestpac.com/search/default.asp';
+            }
         }
 
-        const ssLink = document.createElement('button');
-        ssLink.innerHTML = 'ServSuite';
-        ssLink.style.cursor = 'pointer';
-        ssLink.classList.add('pestinated');
-        ssLink.onclick = goToSSHandler;
+        const oldAccountLink = document.createElement('button');
+        oldAccountLink.innerHTML = oldPlatform;
+        oldAccountLink.style.cursor = 'pointer';
+        oldAccountLink.onclick = goToSSHandler;
 
         const pageHeader = document.getElementById('page-header');
-        pageHeader.appendChild(ssLink);
+        pageHeader.appendChild(oldAccountLink);
 
-        GM_deleteValue('SS_to_PP');
+        const addSetup = GM_getValue('PP_addSetup');
 
-        GM_addValueChangeListener('SS_program', function(name, old_value, new_value, remote){});
+      //  GM_addValueChangeListener('PP_addSetup', function(name, old_value, new_value, remote){});
 
-        GM_addValueChangeListener('SS_program', function(name, old_value, SS_program, remote){
-            if(!SS_program) return;
-            window.focus();
-            setTimeout(()=>{
-              //  if(confirm("Transfer service from "+SS_program.id+" to "+ssid+"?")){
-                    addServiceSetup();
-              //  }
-            },500)
+        console.log(addSetup);
 
-        });
+        if(!addSetup){
+            GM_addValueChangeListener('PP_addSetup', function(name, old_value, addSetup, remote){
+                addServiceSetup(addSetup);
+            });
+        } else {
+            addServiceSetup(addSetup);
+        }
+
+
     }
 
     const ppLocationEdit = () => {
@@ -250,17 +281,9 @@
         taxCodeInput.click();
         taxCodeInput.blur();
 
-        const ssInput = document.getElementById('UserDef1');
-        const ssid = ssInput.value;
-        ssInput.value = ("0000" + ssid).slice(-5);
-
         const directionsInput = document.getElementById('Directions');
         if(!directionsInput.value.match(/\*/g)){
             directionsInput.value = "** "+directionsInput.value;
-        }
-        if(GM_getValue('quicksave')){
-            GM_deleteValue('quicksave');
-            execute([{click:'butSave'}])
         }
     }
 
@@ -273,14 +296,13 @@
             document.getElementById('butSearch').click();
         }
 
-        const SS_to_PP = GM_getValue('SS_to_PP');
-        GM_deleteValue('SS_to_PP');
+        const oldAccount_to_PP = GM_getValue('PP_addSetup');
+        
+        console.log(oldAccount_to_PP);
 
-        console.log(SS_to_PP);
 
-
-        if(SS_to_PP){
-            goToPPListener(SS_to_PP.id);
+        if(oldAccount_to_PP){
+            goToPPListener(oldAccount_to_PP.id);
         }
     }
 
@@ -309,7 +331,7 @@
         const goToPPHandler = () => {
             const newWindow = window.open('https://app.west.pestpac.com/search/default.asp');
             const id = document.getElementById('lbeditaccount').textContent.split(' ')[2];
-            GM_setValue('SS_to_PP', {id: id});
+            GM_setValue('oldAccount_to_PP', {id: id});
         }
 
         const findSiteAddress = (target) => {
@@ -343,8 +365,8 @@
             const copyProgram = (e) => {
                 let program = programDetails[e.target.id.split('_')[1]];
                 program.id = document.getElementById('lbeditaccount').textContent.split(' ')[2];
-                GM_setValue('SS_program','');
-                GM_setValue('SS_program', program);
+                GM_setValue('oldAccount_to_PP','');
+                GM_setValue('oldAccount_to_PP', program);
             }
 
             Array.from(programRow).forEach((row, i) => {
@@ -353,7 +375,7 @@
                     program.service = row.children[1].children[0].textContent;
                     program.lastDate = row.children[2].textContent;
                     program.nextDate = row.children[3].textContent;
-                    program.ammount = row.children[5].textContent;
+                    program.amount = row.children[5].textContent;
                     program.route = row.children[7].textContent;
 
                     const ppLink = document.createElement('button');
@@ -369,32 +391,34 @@
 
     const ppServiceSetup = () => {
         const enterSetupDetails = (program) => {
+            console.log(program);
+
             const lastDate = new Date(program.lastDate)
             const nextDate = new Date(program.nextDate);
             const weekday = getWeekday(lastDate);
 
             const week = getWeek(nextDate ? nextDate : lastDate);
             const month = getMonth(nextDate ? nextDate : lastDate);
-            const serviceCode = convertService(program.service);
+            const serviceCode = program.serviceCode ? program.serviceCode : convertService(program.service);
             const schedule = parseSchedule(serviceCode, month, week, weekday);
-            const ammount = parseInt(program.ammount.replace('$',''));
+            const amount = program.amount;
             let duration = 25;
 
-            if(ammount > 175){
+            if(amount > 175){
                 duration = 200;
-            } else if(ammount > 150){
+            } else if(amount > 150){
                 duration = 130;
-            } else if(ammount > 125){
+            } else if(amount > 125){
                 duration = 115;
-            } else if(ammount > 100){
+            } else if(amount > 100){
                 duration = 100;
-            } else if(ammount > 90){
+            } else if(amount > 90){
                 duration = 55
-            } else if(ammount > 80){
+            } else if(amount > 80){
                 duration = 50
-            } else if(ammount > 70){
+            } else if(amount > 70){
                 duration = 40
-            } else if(ammount > 60){
+            } else if(amount > 60){
                 duration = 35
             }
 
@@ -408,7 +432,7 @@
                 {
                     input: {
                         target: 'UnitPrice1',
-                        value: ammount
+                        value: amount
                     }
                 },
                 {
@@ -419,8 +443,8 @@
                 },
                 {
                     input: {
-                        target: 'Route',
-                        value: program.route.substring(0,1)
+                        target: 'StartDate',
+                        value: program.addedDate
                     }
                 },
                 {
@@ -430,38 +454,159 @@
                     }
                 },
                 {
-                    click: 'AnyTimeSpan2'
+                    input: {
+                        target: 'LastGeneratedDate',
+                        value: program.lastDate
+                    }
+                },
+                {
+                    conditional: program.startMonth <= 1,
+                    click: 'Skip1'
+                },
+                {
+                    conditional: program.startMonth <= 2,
+                    click: 'Skip2'
+                },
+                {
+                    conditional: program.startMonth <= 3,
+                    click: 'Skip3'
+                },
+                {
+                    conditional: program.startMonth <= 4,
+                    click: 'Skip4'
+                },
+                {
+                    conditional: program.endMonth >= 9,
+                    click: 'Skip9'
+                },
+                {
+                    conditional: program.endMonth >= 10,
+                    click: 'Skip10'
+                },
+                {
+                    conditional: program.endMonth >= 11,
+                    click: 'Skip11'
+                },
+                {
+                    conditional: program.endMonth >= 12,
+                    click: 'Skip12'
+                },
+                {
+                    input: {
+                        target: 'Tech1',
+                        value: 'JEFFWILSON'
+                    }
+                },
+                {
+                    conditional: !program.target,
+                    click: 'IncludedPestSpan'
                 }
             ]);
 
-            /*
-            const serviceCodeInput = document.getElementById('ServiceCode1');
-            const unitPriceInput = document.getElementById('UnitPrice1');
-            const scheduleInput = document.getElementById('Schedule');
-            const routeInput = document.getElementById('Route');
-
-            serviceCodeInput.focus();
-            serviceCodeInput.value = serviceCode;
-            serviceCodeInput.blur();
-
-            scheduleInput.focus();
-            scheduleInput.value = schedule;
-            scheduleInput.blur();
-
-            unitPriceInput.focus();
-            unitPriceInput.value = program.ammount.replace('$','');
-            unitPriceInput.blur();
-
-            routeInput.focus();
-            routeInput.value = program.route.substring(0,1);
-            routeInput.blur();
-            */
         }
 
-        const program = GM_getValue('SS_program');
-        GM_setValue('SS_program','');
+        const setupData = GM_getValue('PP_addSetup');
+        GM_setValue('PP_addSetup','');
 
-        if(program) enterSetupDetails(program);
+        if(setupData){
+            enterSetupDetails(setupData);
+        }
+
+
+
+    }
+
+    const prCustomers = () => {
+        const oldAccount = GM_getValue('PP_to_PR');
+        const customerSearch = document.getElementById('customerSearch');
+
+        console.log(oldAccount);
+
+        if(oldAccount){
+            customerSearch.focus();
+            customerSearch.value = oldAccount.id;
+            GM_setValue('PP_to_PR', null);
+        }
+
+        const recurringServiceForm = document.getElementById('recurringServiceForm');
+
+        const subscriptionPanel = document.getElementById('subscriptionPanel');
+
+        console.log(subscriptionPanel);
+
+        var observer = new MutationObserver(function(mutations){
+
+            mutations.forEach(function(mutation){
+
+                if (!mutation.addedNodes) return
+
+                for (var i = 0; i < mutation.addedNodes.length; i++) {
+
+                    var node = mutation.addedNodes[i];
+
+                    if(node){
+                        if(node.children && node.children[0]){
+                            if(node.children[0].children && node.children[0].children[1]){
+                                if(node.children[0].children[1].id==='subscriptionForm'){
+                                    addPestPacDiv();
+                                }
+                            }
+                        }
+                    }
+                }
+
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+
+        const addPestPacDiv = (node) => {
+            const pestPacDiv = document.createElement('div');
+            pestPacDiv.innerHTML = 'Copy to PestPac';
+            pestPacDiv.classList.add('callout-item');
+            pestPacDiv.onclick = copyToPestPac;
+            const subscriptionActionDiv = document.getElementById('subscriptionActionDiv');
+            subscriptionActionDiv.children[2].appendChild(pestPacDiv);
+        }
+
+        const copyToPestPac = () => {
+            const id = document.getElementById('ui-id-14').children[0].innerHTML.replace('\[','').replace('\] ','');
+            const servicePlan = document.getElementById('addServicePlanForm').children[6].children[0].children[0].children[0].innerHTML;
+            const seasonStart = document.getElementsByName('seasonalStart')[0].value;
+            const seasonEnd = document.getElementsByName('seasonalEnd')[0].value;
+            const startMonth = parseInt(seasonStart.substring(5,7));
+            const endMonth = parseInt(seasonEnd.substring(5,7));
+            const dateAdded = document.getElementById('dateAdded').value.replaceAll('-','\/');
+            const addedDate = dateAdded.substring(5)+ '/' + dateAdded.substring(0,4)
+            const lastDate = document.getElementsByClassName('schedule-date')[0].innerHTML;
+            const amount = document.getElementsByClassName('collapsedTotalAmount')[2].innerHTML;
+
+            let serviceCode = '';
+            let target = '';
+
+            if(servicePlan==='6 Wk Annual Service Agreement'){
+                serviceCode = '6-WEEK';
+                target = 'ORGANIC';
+            }
+
+            const serviceData = {
+                id,
+                serviceCode,
+                target,
+                startMonth,
+                endMonth,
+                addedDate,
+                lastDate,
+                amount
+            };
+
+            GM_setValue('PP_addSetup', serviceData);
+
+        }
 
     }
 
