@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.308
+// @version      0.309
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -55,6 +55,43 @@
         const oldAccountText = oldAccountLabel.parentElement.lastChild;
         const oldAccount = oldAccountText.textContent.substring(2);
         return oldAccount;
+    }
+
+    function goToAccount(accountId, openWindow){
+        var quickSearchField = document.getElementById("quicksearchfield");
+        quickSearchField.value = accountId;
+
+        var keyUpEvent = document.createEvent("Event");
+        keyUpEvent.initEvent('keyup');
+        quickSearchField.dispatchEvent(keyUpEvent);
+
+        var i = 0;
+        var clickInterval = setInterval(function(){
+            i++;
+            var searchResults = document.getElementsByClassName("quick-search-result");
+            if(searchResults.length > 0){
+                clearInterval(clickInterval);
+
+                var pattern = new RegExp(/'(.*?)'/g);
+                var onclickText = searchResults[0].getAttribute('onclick');
+                var newURL = pattern.exec(onclickText)[0].replaceAll("'", "");
+
+                if(openWindow){
+                    var newWindow = window.open("https://app.west.pestpac.com"+newURL);
+                    quickSearchField.value = "";
+                    document.getElementsByClassName("actions")[0].children[1].click();
+                } else {
+                    window.location.href="https://app.west.pestpac.com"+newURL;
+                }
+            }
+
+            if(i > 10) clearInterval(clickInterval);
+        }, 100);
+    }
+
+    function traverseAccounts(forward, startID){
+        var newID = forward ? startID+1 : startID-1;
+        goToAccount(newID);
     }
 
     function getWeekday(input){
@@ -147,6 +184,8 @@
 
         setTimeout(()=>{
 
+            console.log(command);
+
             let errors = [];
             if(!command.conditional){
                 if(command.input && command.input.value){
@@ -160,8 +199,6 @@
                     }
                 } else if(command.click){
                     try {
-                        console.log(document.getElementById(command.click));
-
                         document.getElementById(command.click).click();
                     } catch(e){
                         errors.push(e)
@@ -178,6 +215,10 @@
     }
 
     const initializePestinator = () => {
+        if(urlContains(["app.west.pestpac.com"])){
+            traversinator();
+        }
+
         if(urlContains(["app.west.pestpac.com/location/detail.asp"])){
             retrieveCSS();
             ppLocationDetail();
@@ -207,6 +248,115 @@
         }
     }
 
+    function traversinator(){
+
+        findAccountListener();
+
+        if(!urlContains(["location/detail.asp?LocationID"])) return;
+
+        var advancedSearchWrapper = document.getElementsByClassName("advanced-search-wrapper")[0];
+        var locationHeaderDetailLink = document.getElementById("locationHeaderDetailLink");
+
+        if(!locationHeaderDetailLink) return;
+
+        advancedSearchWrapper.appendChild(createTraverseDiv());
+
+        function createTraverseDiv(){
+            var traverseDiv = document.createElement("div");
+            traverseDiv.id = "traverse-div";
+            traverseDiv.style.width = "136px";
+            traverseDiv.style.padding = "10px 0px";
+
+            traverseDiv.appendChild(createPrevLink());
+            traverseDiv.appendChild(createNextLink());
+
+            return traverseDiv;
+
+            function createPrevLink(){
+                var prevLink = document.createElement("a");
+                prevLink.classList.add("advanced-search");
+                prevLink.innerHTML = "Prev";
+                prevLink.href = "#";
+                prevLink.style.width = "25%";
+                prevLink.style.marginRight = "25%";
+                prevLink.style.display = "inline-block";
+                prevLink.style.textAlign = "left";
+
+                prevLink.addEventListener("click", function(e){
+                    e.preventDefault();
+                    var currentID = parseInt(locationHeaderDetailLink.children[0].innerHTML);
+                    traverseAccounts(false, currentID);
+                });
+
+                return prevLink;
+            }
+
+            function createNextLink(){
+                var nextLink = document.createElement("a");
+                nextLink.classList.add("advanced-search");
+                nextLink.innerHTML = "Next";
+                nextLink.href = "#";
+                nextLink.style.width = "25%";
+                nextLink.style.display = "inline-block";
+                nextLink.style.textAlign = "right";
+
+                nextLink.addEventListener("click", function(e){
+                    e.preventDefault();
+                    var currentID = parseInt(locationHeaderDetailLink.children[0].innerHTML);
+                    traverseAccounts(true, currentID);
+                });
+
+                return nextLink;
+            }
+
+        }
+
+        function traverseAccounts(forward, startID){
+            var newID = forward ? startID+1 : startID-1;
+            goToAccount(newID);
+        }
+
+        function findAccountListener(){
+            GM_deleteValue("findAccount");
+
+            GM_addValueChangeListener("findAccount", function(name, old_value, new_value, remote){
+                if(!checkLastFocus()) return;
+
+                window.focus();
+
+                var accountInfo = JSON.parse(new_value);
+
+                var accountIdRegEx = /(?<!\d)\d{5,6}(?!\d)/;
+                var accountIdRegExMatcher = new RegExp(accountIdRegEx);
+                var accountIdMatch = null;
+                accountIdMatch = accountIdRegExMatcher.exec(accountInfo.name);
+
+                if(accountIdMatch){
+                    console.log("goToAccount: Account="+accountIdMatch[0]);
+                    goToAccount(accountIdMatch[0]);
+                } else if(accountInfo.name.includes("LEAD")){
+                    var leadName = accountInfo.name.replace("LEAD", "").trim();
+
+                    GM_setValue("findLead", JSON.stringify({
+                        name: leadName,
+                        phone: accountInfo.phone,
+                        timeStamp: Date.now()
+                    }));
+
+                    window.location.href = "https://app.west.pestpac.com/leads/";
+                } else {
+                    var phoneNumberMatch = phoneNumberRegExMatcher.exec(accountInfo.phone);
+
+                    if(phoneNumberMatch){
+                        console.log("goToAccount: Phone="+phoneNumberMatch[0]);
+                        goToAccount(phoneNumberMatch[0]);
+                    }
+                }
+
+            });
+        }
+    }
+
     const ppLocationDetail = () => {
         const ssid = getOldAccount();
 
@@ -230,19 +380,30 @@
                 console.log(oldAccount);
                 GM_setValue('PP_to_PR', {id: oldAccount});
                 window.open('https://organicspiderman.fieldroutes.com/customers');
-
             }
         }
 
-        const addServiceSetup = (addSetup) => {
+        const phone = document.getElementsByClassName('contact-link-span')[1].getAttribute('data-phonenumber');
+        if(phone.length===10){
+            document.getElementById('locationHeaderDetailLink').click();
+        }
+
+
+        const goToPestPacAccount = (account) => {
             const oldAccount = getOldAccount();
-            console.log(oldAccount+' ? '+addSetup.id);
-            if(oldAccount===addSetup.id){
-                window.focus();
-                setTimeout(()=>{
-                    document.getElementById('recurringServicesContainer').children[0].children[0].children[0].children[1].click();
-                    document.getElementsByClassName('pendo-location-recurring-service__add-setup')[0].click();
-                },500)
+            if(oldAccount===account.id){
+                if(account.addSetup){
+                    window.focus();
+                    setTimeout(()=>{
+                        document.getElementById('recurringServicesContainer').children[0].children[0].children[0].children[1].click();
+                        document.getElementsByClassName('pendo-location-recurring-service__add-setup')[0].click();
+                    }, 500);
+                } else {
+                    GM_setValue('oldAccount_to_PP', '');
+                    GM_addValueChangeListener('oldAccount_to_PP', function(name, old_value, account, remote){
+                        goToPestPacAccount(account);
+                    });
+                }
             } else {
                 window.focus();
                 window.location.href = 'https://app.west.pestpac.com/search/default.asp';
@@ -257,21 +418,15 @@
         const pageHeader = document.getElementById('page-header');
         pageHeader.appendChild(oldAccountLink);
 
-        const addSetup = GM_getValue('PP_addSetup');
+        const oldAccount_to_PP = GM_getValue('oldAccount_to_PP');
 
-      //  GM_addValueChangeListener('PP_addSetup', function(name, old_value, new_value, remote){});
-
-        console.log(addSetup);
-
-        if(!addSetup){
-            GM_addValueChangeListener('PP_addSetup', function(name, old_value, addSetup, remote){
-                addServiceSetup(addSetup);
-            });
+        if(oldAccount_to_PP){
+            goToPestPacAccount(oldAccount_to_PP);
         } else {
-            addServiceSetup(addSetup);
+            GM_addValueChangeListener('oldAccount_to_PP', function(name, old_value, account, remote){
+                goToPestPacAccount(account);
+            });
         }
-
-
     }
 
     const ppLocationEdit = () => {
@@ -285,6 +440,34 @@
         if(!directionsInput.value.match(/\*/g)){
             directionsInput.value = "** "+directionsInput.value;
         }
+
+        const phoneInput = document.getElementById('Phone');
+        if(phoneInput.value){
+            phoneInput.focus();
+            phoneInput.blur();
+        }
+
+        const altPhoneInput = document.getElementById('AltPhone');
+        if(altPhoneInput.value){
+            altPhoneInput.focus();
+            altPhoneInput.blur();
+        }
+
+        const mobileInput = document.getElementById('Mobile');
+        if(mobileInput.value){
+            mobileInput.focus();
+            mobileInput.blur();
+        }
+
+        const mobileLink = mobileInput.parentElement.parentElement.children[0];
+        mobileLink.innerHTML = '<strong>Mobile</strong>';
+        mobileLink.style.cursor = 'pointer';
+        mobileLink.onclick = () => {
+            const primaryPhone = phoneInput.value;
+            console.log(mobileLink);
+            mobileInput.value = primaryPhone;
+        };
+
     }
 
     const ppSearchDefault = () => {
@@ -296,13 +479,10 @@
             document.getElementById('butSearch').click();
         }
 
-        const oldAccount_to_PP = GM_getValue('PP_addSetup');
-        
-        console.log(oldAccount_to_PP);
+        const oldAccount = GM_getValue('oldAccount_to_PP');
 
-
-        if(oldAccount_to_PP){
-            goToPPListener(oldAccount_to_PP.id);
+        if(oldAccount.id){
+            goToPPListener(oldAccount.id);
         }
     }
 
@@ -400,7 +580,7 @@
             const week = getWeek(nextDate ? nextDate : lastDate);
             const month = getMonth(nextDate ? nextDate : lastDate);
             const serviceCode = program.serviceCode ? program.serviceCode : convertService(program.service);
-            const schedule = parseSchedule(serviceCode, month, week, weekday);
+            const schedule = program.schedule ? program.schedule : parseSchedule(serviceCode, month, week, weekday);
             const amount = program.amount;
             let duration = 25;
 
@@ -433,12 +613,6 @@
                     input: {
                         target: 'UnitPrice1',
                         value: amount
-                    }
-                },
-                {
-                    input: {
-                        target: 'Schedule',
-                        value: schedule
                     }
                 },
                 {
@@ -498,6 +672,12 @@
                     }
                 },
                 {
+                    input: {
+                        target: 'Schedule',
+                        value: schedule
+                    }
+                },
+                {
                     conditional: !program.target,
                     click: 'IncludedPestSpan'
                 }
@@ -505,15 +685,63 @@
 
         }
 
-        const setupData = GM_getValue('PP_addSetup');
-        GM_setValue('PP_addSetup','');
+        const oldAccount = GM_getValue('oldAccount_to_PP');
+        GM_setValue('oldAccount_to_PP','');
 
-        if(setupData){
-            enterSetupDetails(setupData);
+        if(oldAccount.addSetup){
+            enterSetupDetails(oldAccount.addSetup);
         }
 
+        const addReminderLinks = () => {
 
+            const setTextReminder = () => {
+                execute([
+                    {
+                        click: 'TextNotify1'
+                    },
+                    {
+                        click: 'CallNotify1'
+                    },
+                    {
+                        input: {
+                            target: 'NotificationDays1',
+                            value: 2
+                        }
+                    }
+                ]);
+            }
 
+            const setEmailReminder = () => {
+                execute([
+                    {
+                        click: 'EmailNotify1'
+                    },
+                    {
+                        click: 'CallNotify1'
+                    },
+                    {
+                        input: {
+                            target: 'NotificationDays1',
+                            value: 2
+                        }
+                    }
+                ]);
+            }
+
+            const tblNotificationsDiv = document.getElementById('tblNotifications');
+
+            const emailLink = tblNotificationsDiv.children[1].children[0].children[2];
+            emailLink.innerHTML = '<strong>Email</strong>';
+            emailLink.style.cursor = 'pointer';
+            emailLink.onclick = setEmailReminder;
+
+            const textLink = tblNotificationsDiv.children[1].children[0].children[3];
+            textLink.innerHTML = '<strong>Text</strong>';
+            textLink.style.cursor = 'pointer';
+            textLink.onclick = setTextReminder;
+        }
+
+        addReminderLinks();
     }
 
     const prCustomers = () => {
@@ -532,8 +760,6 @@
 
         const subscriptionPanel = document.getElementById('subscriptionPanel');
 
-        console.log(subscriptionPanel);
-
         var observer = new MutationObserver(function(mutations){
 
             mutations.forEach(function(mutation){
@@ -546,7 +772,9 @@
 
                     if(node){
                         if(node.children && node.children[0]){
-                            if(node.children[0].children && node.children[0].children[1]){
+                            if(node.id==='customerWindow'){
+                                addPestPacLink();
+                            } else if(node.children[0].children && node.children[0].children[1]){
                                 if(node.children[0].children[1].id==='subscriptionForm'){
                                     addPestPacDiv();
                                 }
@@ -563,8 +791,19 @@
             subtree: true
         });
 
+        const addPestPacLink = () => {
+            const pestPacAnchor = document.createElement('a');
+            pestPacAnchor.innerHTML = 'PestPac';
+            pestPacAnchor.classList.add('ui-tabs-anchor');
+            pestPacAnchor.href="#";
+            pestPacAnchor.onclick = goToPestPac;
+            const pestPacLink = document.createElement('li');
+            pestPacLink.appendChild(pestPacAnchor);
+            const customerWindow = document.getElementById('customerWindow');
+            customerWindow.children[0].children[1].children[0].appendChild(pestPacLink);
+        }
 
-        const addPestPacDiv = (node) => {
+        const addPestPacDiv = () => {
             const pestPacDiv = document.createElement('div');
             pestPacDiv.innerHTML = 'Copy to PestPac';
             pestPacDiv.classList.add('callout-item');
@@ -573,9 +812,14 @@
             subscriptionActionDiv.children[2].appendChild(pestPacDiv);
         }
 
+        const goToPestPac = () => {
+            const id = document.getElementById('ui-id-14').children[0].innerHTML.replace('\[','').replace('\] ','');
+            GM_setValue('oldAccount_to_PP', {id});
+        }
+
         const copyToPestPac = () => {
             const id = document.getElementById('ui-id-14').children[0].innerHTML.replace('\[','').replace('\] ','');
-            const servicePlan = document.getElementById('addServicePlanForm').children[6].children[0].children[0].children[0].innerHTML;
+            const servicePlan = document.getElementById('addServicePlanForm').children[6].children[0].children[0].children[0].innerHTML.trim();
             const seasonStart = document.getElementsByName('seasonalStart')[0].value;
             const seasonEnd = document.getElementsByName('seasonalEnd')[0].value;
             const startMonth = parseInt(seasonStart.substring(5,7));
@@ -586,25 +830,42 @@
             const amount = document.getElementsByClassName('collapsedTotalAmount')[2].innerHTML;
 
             let serviceCode = '';
+            let schedule = '';
             let target = '';
+
+            console.log(serviceCode);
 
             if(servicePlan==='6 Wk Annual Service Agreement'){
                 serviceCode = '6-WEEK';
                 target = 'ORGANIC';
+            } else if(servicePlan==='Monthly Annual Service Agreement'){
+                serviceCode = 'PC-MONTHLY';
+                target = 'ORGANIC';
+            } else if(servicePlan==='Bi Monthly'){
+                serviceCode = 'PC-BIMONTHLY';
+                target = 'ORGANIC';
+                schedule = 'I-BIMO';
+            } else if(servicePlan==='Option 2'){
+                serviceCode = 'PC-SEMIANNUAL';
+                target = 'ORGANIC';
+                schedule = 'I-2X YEAR';
             }
 
             const serviceData = {
                 id,
-                serviceCode,
-                target,
-                startMonth,
-                endMonth,
-                addedDate,
-                lastDate,
-                amount
+                addSetup: {
+                    serviceCode,
+                    schedule,
+                    target,
+                    startMonth,
+                    endMonth,
+                    addedDate,
+                    lastDate,
+                    amount
+                }
             };
 
-            GM_setValue('PP_addSetup', serviceData);
+            GM_setValue('oldAccount_to_PP', serviceData);
 
         }
 
