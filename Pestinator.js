@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.309
+// @version      0.310
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -383,8 +383,8 @@
             }
         }
 
-        const phone = document.getElementsByClassName('contact-link-span')[1].getAttribute('data-phonenumber');
-        if(phone.length===10){
+        const phone = document.getElementsByClassName('contact-link-span')[1]?.getAttribute('data-phonenumber');
+        if(phone?.length===10){
             document.getElementById('locationHeaderDetailLink').click();
         }
 
@@ -546,7 +546,7 @@
                 let program = programDetails[e.target.id.split('_')[1]];
                 program.id = document.getElementById('lbeditaccount').textContent.split(' ')[2];
                 GM_setValue('oldAccount_to_PP','');
-                GM_setValue('oldAccount_to_PP', program);
+                GM_setValue('oldAccount_to_PP', {id: program.id, addSetup: program});
             }
 
             Array.from(programRow).forEach((row, i) => {
@@ -555,7 +555,7 @@
                     program.service = row.children[1].children[0].textContent;
                     program.lastDate = row.children[2].textContent;
                     program.nextDate = row.children[3].textContent;
-                    program.amount = row.children[5].textContent;
+                    program.amount = row.children[5].textContent.replace('$','');
                     program.route = row.children[7].textContent;
 
                     const ppLink = document.createElement('button');
@@ -634,42 +634,36 @@
                     }
                 },
                 {
-                    conditional: program.startMonth <= 1,
+                    conditional: !program.startMonth || program.startMonth <= 1,
                     click: 'Skip1'
                 },
                 {
-                    conditional: program.startMonth <= 2,
+                    conditional: !program.startMonth || program.startMonth <= 2,
                     click: 'Skip2'
                 },
                 {
-                    conditional: program.startMonth <= 3,
+                    conditional: !program.startMonth || program.startMonth <= 3,
                     click: 'Skip3'
                 },
                 {
-                    conditional: program.startMonth <= 4,
+                    conditional: !program.startMonth || program.startMonth <= 4,
                     click: 'Skip4'
                 },
                 {
-                    conditional: program.endMonth >= 9,
+                    conditional: !program.endMonth || program.endMonth >= 9,
                     click: 'Skip9'
                 },
                 {
-                    conditional: program.endMonth >= 10,
+                    conditional: !program.endMonth || program.endMonth >= 10,
                     click: 'Skip10'
                 },
                 {
-                    conditional: program.endMonth >= 11,
+                    conditional: !program.endMonth || program.endMonth >= 11,
                     click: 'Skip11'
                 },
                 {
-                    conditional: program.endMonth >= 12,
+                    conditional: !program.endMonth || program.endMonth >= 12,
                     click: 'Skip12'
-                },
-                {
-                    input: {
-                        target: 'Tech1',
-                        value: 'JEFFWILSON'
-                    }
                 },
                 {
                     input: {
