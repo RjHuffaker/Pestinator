@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pestinator
 // @namespace    https://github.com/RjHuffaker/Pestinator/blob/main/Pestinator.js
-// @version      0.310
+// @version      0.311
 // @description  Provides various helper functions to PestPac and ServSuite, customized to our particular use-case.
 // @author       Ryan Huffaker
 // @match        app.west.pestpac.com/*
@@ -235,6 +235,15 @@
             retrieveCSS();
             ppServiceSetup();
         }
+
+        if(urlContains(["app.west.pestpac.com/lookup/branchZip/default.asp"])){
+            ppBranchZipDefault();
+        }
+
+        if(urlContains(["app.west.pestpac.com/lookup/branchZip/detail.asp"])){
+            ppBranchZipDetail();
+        }
+
         if(urlContains(["sprolive.theservicepro.net/user/home.aspx"])){
             retrieveCSS();
             ssHome();
@@ -863,6 +872,27 @@
 
         }
 
+    }
+
+    const ppBranchZipDefault = () => {
+        window.close();
+    }
+
+    const ppBranchZipDetail = () => {
+
+        if(!document.getElementById('ZipCode').value){
+            document.getElementById('butDelete').click();
+            const zipCodeId = window.location.href.replace('https://app.west.pestpac.com/lookup/branchZip/detail.asp?Mode=Edit&ZipCodeID=','');
+            const nextZipCodeId = +zipCodeId + 1;
+            window.open('https://app.west.pestpac.com/lookup/branchZip/detail.asp?Mode=Edit&ZipCodeID='+nextZipCodeId);
+
+        }
+
+        var realConfirm = window.confirm;
+        window.confirm = function(){
+            window.confirm = realConfirm;
+            return true;
+        };
     }
 
     initializePestinator();
